@@ -99,18 +99,26 @@ def load_energy_data():
 
 df_energy = load_energy_data()
 
-# --- MAIN DASHBOARD METRICS ---
-col1, col2, col3, col4 = st.columns(4)
-
+# --- DYNAMIC CALCULATIONS (TAM UYUMLU MATEMATİK) ---
 total_today = df_energy['Top Tüketim (kWh)'].sum()
 phantom_today = df_energy['Hayalet Yük / İsraf (kWh)'].sum()
 waste_percentage = round((phantom_today / total_today) * 100, 1)
-co2_saved_est = round((phantom_today * 0.8 * 0.42), 1)
+
+# NILM + Night Purge Toplam Tasarrufu
+night_purge_kwh_save = 220  # Gece kompresör kapatıp soğutmaktan gelen kWh tasarruf
+total_kwh_saved = int((phantom_today * 0.8) + night_purge_kwh_save)
+
+# Karbon Faktörü (0.42 kg CO2 / kWh) & Finansal Faktör (4.25 TL / kWh)
+co2_saved_total = round(total_kwh_saved * 0.42, 1)
+tl_saved_total = int(total_kwh_saved * 4.25)
+
+# --- MAIN DASHBOARD METRICS ---
+col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Günlük Toplam Tüketim", f"{total_today:,} kWh")
 col2.metric("NILM Tespiti: Hayalet Yük", f"{phantom_today} kWh", delta=f"%{waste_percentage} İsraf Mevcut", delta_color="inverse")
-col3.metric("Hedeflenen Günlük Tasarruf", f"{int(phantom_today * 0.8)} kWh", delta="%80 İsraf Önleme Target", delta_color="normal")
-col4.metric("Engellenecek Karbon", f"{co2_saved_est} kg CO₂", delta="Ağaç Denkliği: 3 Ağaç", delta_color="normal")
+col3.metric("Hedeflenen Günlük Tasarruf", f"{total_kwh_saved} kWh", delta="%80 İsraf + Night-Purge", delta_color="normal")
+col4.metric("Engellenecek Karbon", f"{co2_saved_total} kg CO₂", delta="Ağaç Denkliği: 6 Ağaç", delta_color="normal")
 
 st.markdown("---")
 
@@ -137,7 +145,7 @@ st.markdown("---")
 # --- AI PRESCRIPTIVE DECISION ENGINE ---
 st.subheader("🤖 AI Preskriptif Karar Destek ve Otonom Reçete Motoru")
 
-st.markdown("""
+st.markdown(f"""
 <div class="recipe-card">
     <h4>📋 GÜNÜN OTONOM ENERJİ TASARRUF REÇETESİ</h4>
     <p><b>Konum:</b> Ankara, Türkiye | <b>Sistem Durumu:</b> BMS Bağlantısı Aktif (BACnet/IP Gateway)</p>
@@ -147,8 +155,8 @@ st.markdown("""
     </ul>
     <br>
     <div>
-        <span class="impact-badge-green">💰 Günlük Tasarruf: 4.250 TL</span>
-        <span class="impact-badge-blue">🌱 Karbon Engelleme: 142 kg CO₂</span>
+        <span class="impact-badge-green">💰 Günlük Tasarruf: {tl_saved_total:,} TL</span>
+        <span class="impact-badge-blue">🌱 Karbon Engelleme: {co2_saved_total} kg CO₂</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -190,7 +198,7 @@ selected_question = st.selectbox(
         "--- Lütfen bir soru seçin ---",
         "❓ Neden gece 02:00 - 05:00 saatleri seçildi?",
         "❓ Gece havalandırması bina içi termal konforu düşürür mü?",
-        "❓ Finansal 4.250 TL tasarruf hesabı neye dayanıyor?",
+        "❓ Finansal tasarruf hesabı neye dayanıyor?",
         "❓ Eski BMS sistemimiz bu reçeteyi nasıl uygulayacak?"
     ]
 )
@@ -211,11 +219,11 @@ elif selected_question == "❓ Gece havalandırması bina içi termal konforu d�
     </div>
     """, unsafe_allow_html=True)
 
-elif selected_question == "❓ Finansal 4.250 TL tasarruf hesabı neye dayanıyor?":
-    st.markdown("""
+elif selected_question == "❓ Finansal tasarruf hesabı neye dayanıyor?":
+    st.markdown(f"""
     <div class="chat-box">
         <b>🤖 AI Preskriptif Analiz:</b><br>
-        Bu reçete ile yüksek elektrik çeken gazlı soğutma kompresörleri çalıştırılmadan sadece düşük güçlü havalandırma fanlarıyla pasif soğutma yapılır. Günlük ortalama 1.000 kWh HVAC elektrik tüketimi engellenerek 4.250 TL ve 142 kg CO₂ doğrudan tasarruf edilir.
+        Bu reçete ile yüksek elektrik çeken gazlı soğutma kompresörleri çalıştırılmadan sadece düşük güçlü havalandırma fanlarıyla pasif soğutma yapılır. Günlük toplam {total_kwh_saved} kWh elektrik tüketimi engellenerek {tl_saved_total:,} TL ve {co2_saved_total} kg CO₂ doğrudan tasarruf edilir.
     </div>
     """, unsafe_allow_html=True)
 
