@@ -68,31 +68,50 @@ st.markdown("""
 
 # --- TITLE & HEADER ---
 st.title("⚡ EchoBuilding AI: Dairesel Bina Enerji İşletim Sistemi")
-st.caption("NILM Tabanlı Hayalet Yük Tespiti & Pasif Gece Soğutması (Night-Purge) Reçete Paneli | Ankara / Türkiye")
+st.caption("NILM Tabanlı Hayalet Yük Tespiti & Pasif Gece Soğutması (Night-Purge) Reçete Paneli")
 
 st.markdown("---")
 
 # --- SIDEBAR: CONTROL PANEL ---
 st.sidebar.header("🏢 Bina & Konum Parametreleri")
-building_type = st.sidebar.selectbox("Bina Tipi", ["Kamu Kompleksi", "Ticari Plaza / İş Merkezi", "Üniversite Kampüs Binası"])
-location = st.sidebar.text_input("Şehir", "Ankara, TR")
+building_type = st.sidebar.selectbox("Bina Tipi", ["Ticari Plaza / İş Merkezi", "Kamu Kompleksi", "Üniversite Kampüs Binası"])
+location = st.sidebar.selectbox("Şehir (Canlı İklim Verisi)", ["Ankara", "Erzurum", "İstanbul", "İzmir", "Antalya"])
 sqm = st.sidebar.number_input("Toplam Alan (m²)", value=15000, step=1000)
 
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ Simülasyon Ayarları")
-use_live_weather = st.sidebar.checkbox("Canlı Hava Durumu API (Ankara)", value=True)
+use_live_weather = st.sidebar.checkbox("Canlı Hava Durumu API", value=True)
 selected_day = st.sidebar.date_input("Analiz Tarihi", datetime.date.today())
 
-# --- DYNAMIC SCALE FACTOR BASED ON SQM ---
-# 15.000 m² varsayılan baz alınır, alan değiştikçe tüketim ölçeklenir
+# --- DYNAMIC PARAMETERS BASED ON INPUTS ---
 scale_factor = sqm / 15000.0
+
+# Bina Tipine Göre Hayalet Yük / İsraf Çarpanı
+b_type_multiplier = {
+    "Ticari Plaza / İş Merkezi": 1.2,   # %20-22 arası israf
+    "Kamu Kompleksi": 1.0,              # %18-20 arası israf
+    "Üniversite Kampüs Binası": 0.85    # %15-16 arası israf
+}[building_type]
+
+# Şehre Göre Gece Sıcaklık Profili ve Night-Purge Verim Çarpanı
+weather_profiles = {
+    "Ankara":  {"temps": [14, 13, 12, 12, 11, 12, 15, 18, 22, 25, 27, 28, 29, 28, 27, 25, 22, 19, 17, 16, 15, 15, 14, 14], "np_mult": 1.0},
+    "Erzurum": {"temps": [7, 6, 5, 5, 4, 5, 8, 12, 16, 19, 21, 22, 22, 21, 19, 16, 13, 10, 9, 8, 8, 7, 7, 7], "np_mult": 1.35},
+    "İstanbul":{"temps": [18, 17, 17, 16, 16, 17, 19, 22, 24, 26, 27, 27, 28, 27, 26, 24, 23, 21, 20, 19, 19, 18, 18, 18], "np_mult": 0.8},
+    "İzmir":   {"temps": [21, 20, 19, 19, 18, 19, 22, 25, 28, 30, 32, 33, 33, 32, 31, 29, 27, 25, 24, 23, 22, 22, 21, 21], "np_mult": 0.6},
+    "Antalya": {"temps": [24, 23, 22, 22, 21, 22, 25, 28, 31, 33, 35, 36, 36, 35, 34, 32, 30, 28, 27, 26, 25, 25, 24, 24], "np_mult": 0.4}
+}
+
+city_weather = weather_profiles[location]
+outside_temp = city_weather["temps"]
+np_mult = city_weather["np_mult"]
 
 # --- MOCK DATA GENERATOR (NILM & Energy Consumption) ---
 @st.cache_data
-def load_energy_data(factor):
+def load_energy_data(factor, b_mult):
     dates = pd.date_range(start=datetime.datetime.now() - datetime.timedelta(days=1), periods=24, freq='h')
     base_load = [int(x * factor) for x in [35, 32, 30, 28, 29, 31, 65, 120, 180, 210, 220, 215, 200, 210, 225, 230, 190, 110, 75, 55, 48, 42, 38, 36]]
-    phantom_load = [int(x * factor) for x in [12, 12, 11, 11, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 12, 12, 12, 12, 12]]
+    phantom_load = [int(x * factor * b_mult) for x in [12, 12, 11, 11, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 12, 12, 12, 12, 12]]
     
     df = pd.DataFrame({
         'Saat': [d.strftime('%H:00') for d in dates],
@@ -101,7 +120,7 @@ def load_energy_data(factor):
     })
     return df
 
-df_energy = load_energy_data(scale_factor)
+df_energy = load_energy_data(scale_factor, b_type_multiplier)
 
 # --- DETAYLI DİNAMİK MATEMATİKSEL TASARRUF HESABI ---
 total_today = df_energy['Top Tüketim (kWh)'].sum()
@@ -113,8 +132,8 @@ nilm_kwh_save = int(phantom_today * 0.8)
 nilm_tl_save = int(nilm_kwh_save * 4.25)
 nilm_co2_save = round(nilm_kwh_save * 0.42, 1)
 
-# 2. Night-Purge (Gece Soğutması) Tasarrufu (Alana bağlı dinamik)
-np_kwh_save = int(220 * scale_factor)
+# 2. Night-Purge (Gece Soğutması) Tasarrufu (Şehir iklimine ve Alana bağlı dinamik)
+np_kwh_save = int(220 * scale_factor * np_mult)
 np_tl_save = int(np_kwh_save * 4.25)
 np_co2_save = round(np_kwh_save * 0.42, 1)
 
@@ -137,19 +156,22 @@ st.markdown("---")
 tab1, tab2 = st.tabs(["📊 Yük Ayrıştırma (NILM) & İsraf Analizi", "🌡️ Pasif Gece Soğutması (Night-Purge) Mantığı"])
 
 with tab1:
-    st.subheader("Bina Ana Pano Saatlik Elektrik Tüketimi (NILM Analizi)")
+    st.subheader(f"{building_type} Saatlik Elektrik Tüketimi (NILM Analizi)")
     st.bar_chart(df_energy.set_index('Saat')[['Top Tüketim (kWh)', 'Hayalet Yük / İsraf (kWh)']])
-    st.info(f"💡 **NILM Teşhisi:** {sqm:,} m² alan için gece mesai dışı atıl çalışan cihazların kapatılmasıyla günde **{nilm_kwh_save:,} kWh ({nilm_tl_save:,} TL / {nilm_co2_save:,} kg CO₂)** tasarruf elde edilir.")
+    st.info(f"💡 **NILM Teşhisi:** {sqm:,} m² {building_type} için gece mesai dışı atıl çalışan cihazların kapatılmasıyla günde **{nilm_kwh_save:,} kWh ({nilm_tl_save:,} TL / {nilm_co2_save:,} kg CO₂)** tasarruf elde edilir.")
 
 with tab2:
-    st.subheader("Ankara Termal Kütle ve Dış Hava Sıcaklık Grafiği")
+    st.subheader(f"{location} Termal Kütle ve Dış Hava Sıcaklık Grafiği")
     hours = [f"{i:02d}:00" for i in range(24)]
-    outside_temp = [14, 13, 12, 12, 11, 12, 15, 18, 22, 25, 27, 28, 29, 28, 27, 25, 22, 19, 17, 16, 15, 15, 14, 14]
     inside_temp = [23, 23, 22, 22, 22, 22, 23, 24, 25, 25, 26, 26, 26, 26, 26, 25, 25, 24, 24, 24, 23, 23, 23, 23]
     
     df_temp = pd.DataFrame({'Dış Hava (°C)': outside_temp, 'Bina İç Sıcaklık (°C)': inside_temp}, index=hours)
     st.line_chart(df_temp)
-    st.success(f"✅ **Pasif Potansiyel:** Gece 01:00 - 05:00 arasında dış hava 11-12°C'ye düşmektedir. Night-Purge ile günde ekstra **{np_kwh_save:,} kWh ({np_tl_save:,} TL / {np_co2_save:,} kg CO₂)** pasif soğutma kazanılır.")
+    
+    if np_mult >= 0.8:
+        st.success(f"✅ **Yüksek Pasif Potansiyel ({location}):** Gece dış ortam sıcaklığı ideal soğutma bandına düşmektedir. Night-Purge ile günde ekstra **{np_kwh_save:,} kWh ({np_tl_save:,} TL / {np_co2_save:,} kg CO₂)** pasif soğutma kazanılır.")
+    else:
+        st.warning(f"⚠️ **Sınırlı Pasif Potansiyel ({location}):** Sıcak/Nemli gece iklimi sebebiyle Night-Purge katkısı **{np_kwh_save:,} kWh ({np_tl_save:,} TL)** seviyesindedir. Hibrit fan desteği önerilir.")
 
 st.markdown("---")
 
@@ -159,7 +181,7 @@ st.subheader("🤖 AI Preskriptif Karar Destek ve Otonom Reçete Motoru")
 st.markdown(f"""
 <div class="recipe-card">
     <h4>📋 GÜNÜN OTONOM ENERJİ TASARRUF REÇETESİ</h4>
-    <p><b>Konum:</b> Ankara, Türkiye | <b>Bina Tipi:</b> {building_type} ({sqm:,} m²) | <b>Sistem Durumu:</b> BMS Bağlantısı Aktif (BACnet/IP Gateway)</p>
+    <p><b>Konum:</b> {location}, Türkiye | <b>Bina Tipi:</b> {building_type} ({sqm:,} m²) | <b>Sistem Durumu:</b> BMS Bağlantısı Aktif (BACnet/IP Gateway)</p>
     <ul>
         <li><b>🌙 Pasif Gece Soğutması (Night-Purge):</b> Gece 02:00 - 05:00 arasında HVAC kompresörlerini kapatın, havalandırmayı %40 açın. <br>👉 <i>Katkı: {np_tl_save:,} TL / {np_co2_save:,} kg CO₂</i></li>
         <li style="margin-top: 8px;"><b>🔌 Hayalet Yük Kapatma (NILM):</b> Mesai bitiminde (19:00) 2. Pano altındaki güç gruplarını pasife alın. <br>👉 <i>Katkı: {nilm_tl_save:,} TL / {nilm_co2_save:,} kg CO₂</i></li>
@@ -181,11 +203,11 @@ with col_btn1:
         # BMS Terminal Log Simulation
         st.markdown("##### 🔌 BACnet/IP Terminal Logları:")
         log_box = st.empty()
-        log_text = "> Connecting to Gateway 192.168.1.50:47808...\n"
+        log_text = f"> Connecting to Gateway 192.168.1.50:47808 ({location} Regional Server)...\n"
         log_box.code(log_text)
         time.sleep(0.4)
         
-        log_text += "> Authentication Successful (Priority 8 - Manual Override)\n"
+        log_text += f"> Authentication Successful (Priority 8 - {building_type} Config)\n"
         log_box.code(log_text)
         time.sleep(0.4)
         
@@ -207,28 +229,28 @@ selected_question = st.selectbox(
     "Bir soru seçin veya merak ettiğiniz konuyu inceleyin:",
     [
         "--- Lütfen bir soru seçin ---",
+        "❓ Şehir ve iklim seçimi tasarruf reçetesini nasıl etkiler?",
         "❓ NILM ve Night-Purge tasarruf kalemleri ayrı ayrı nedir?",
-        "❓ Neden gece 02:00 - 05:00 saatleri seçildi?",
         "❓ Gece havalandırması bina içi termal konforu düşürür mü?",
         "❓ Eski BMS sistemimiz bu reçeteyi nasıl uygulayacak?"
     ]
 )
 
-if selected_question == "❓ NILM ve Night-Purge tasarruf kalemleri ayrı ayrı nedir?":
+if selected_question == "❓ Şehir ve iklim seçimi tasarruf reçetesini nasıl etkiler?":
+    st.markdown(f"""
+    <div class="chat-box">
+        <b>🤖 AI Preskriptif Analiz ({location}):</b><br>
+        Seçilen <b>{location}</b> şehrinin gece-gündüz sıcaklık farkı analiz edilmiştir. Karasal iklimlerde (Ankara, Erzurum) gece dış hava soğukluğu yüksek olduğu için Night-Purge verimi artar. Nemli iklimlerde (Antalya, İzmir) ise sistem kompresörsüz soğutma potansiyelini otomatik olarak daha temkinli hesaplar.
+    </div>
+    """, unsafe_allow_html=True)
+
+elif selected_question == "❓ NILM ve Night-Purge tasarruf kalemleri ayrı ayrı nedir?":
     st.markdown(f"""
     <div class="chat-box">
         <b>🤖 AI Preskriptif Analiz:</b><br>
         • <b>NILM (Hayalet Yük):</b> Gece açık unutulan fan ve UPS kaçaklarını keserek <b>{nilm_kwh_save:,} kWh ({nilm_tl_save:,} TL / {nilm_co2_save:,} kg CO₂)</b> tasarruf sağlar.<br>
         • <b>Night-Purge (Gece Soğutması):</b> Kompresörsüz pasif havalandırmayla <b>{np_kwh_save:,} kWh ({np_tl_save:,} TL / {np_co2_save:,} kg CO₂)</b> tasarruf sağlar.<br>
-        • <b>Toplam Günlük Etki ({sqm:,} m²):</b> {total_kwh_saved:,} kWh ({total_tl_saved:,} TL ve {total_co2_saved:,} kg CO₂).
-    </div>
-    """, unsafe_allow_html=True)
-
-elif selected_question == "❓ Neden gece 02:00 - 05:00 saatleri seçildi?":
-    st.markdown("""
-    <div class="chat-box">
-        <b>🤖 AI Preskriptif Analiz:</b><br>
-        OpenWeather API verilerine göre Ankara'da dış ortam sıcaklığı gece saat 02:00 - 05:00 arasında minimum seviyeye (11°C) düşmektedir. Binanın betonarme kütlesini bu saatlerde doğal havayla soğutmak, sabah klimanın ilk çalıştırma pik yükünü %25 azaltmaktadır.
+        • <b>Toplam Günlük Etki ({location} - {sqm:,} m²):</b> {total_kwh_saved:,} kWh ({total_tl_saved:,} TL ve {total_co2_saved:,} kg CO₂).
     </div>
     """, unsafe_allow_html=True)
 
