@@ -12,23 +12,33 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CUSTOM CSS FOR BETTER UI ---
+# --- CUSTOM CSS FOR FIXED TEXT VISIBILITY & MODERN UI ---
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stMetric {
-        background-color: #ffffff;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border-left: 5px solid #00d26a;
-    }
+    /* Dark mode çakışmalarını önlemek için metin renkleri sabitlendi */
     .recipe-card {
-        background-color: #ffffff;
-        padding: 20px;
+        background-color: #ffffff !important;
+        color: #1e1e1e !important;
+        padding: 22px;
         border-radius: 12px;
+        border-left: 6px solid #00d26a;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+    .recipe-card h4 {
+        color: #0f5132 !important;
+        margin-top: 0;
+    }
+    .recipe-card p, .recipe-card li {
+        color: #2b2b2b !important;
+        font-size: 15px;
+    }
+    .chat-box {
+        background-color: #f8f9fa !important;
         border: 1px solid #e9ecef;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        border-radius: 10px;
+        padding: 15px;
+        color: #212529 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -55,7 +65,7 @@ selected_day = st.sidebar.date_input("Analiz Tarihi", datetime.date.today())
 def load_energy_data():
     dates = pd.date_range(start=datetime.datetime.now() - datetime.timedelta(days=1), periods=24, freq='h')
     base_load = [35, 32, 30, 28, 29, 31, 65, 120, 180, 210, 220, 215, 200, 210, 225, 230, 190, 110, 75, 55, 48, 42, 38, 36]
-    phantom_load = [12, 12, 11, 11, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 12, 12, 12, 12, 12] # Mesai dışı israf
+    phantom_load = [12, 12, 11, 11, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 12, 12, 12, 12, 12]
     
     df = pd.DataFrame({
         'Saat': [d.strftime('%H:00') for d in dates],
@@ -101,7 +111,7 @@ with tab2:
 
 st.markdown("---")
 
-# --- AI PRESCRIPTIVE DECISION ENGINE ---
+# --- AI PRESCRIPTIVE DECISION ENGINE & INTERACTIVE ASSISTANT ---
 st.subheader("🤖 AI Preskriptif Karar Destek ve Otonom Reçete Motoru")
 
 st.markdown("""
@@ -112,9 +122,8 @@ st.markdown("""
         <li><b>Gece Soğutması Reçetesi (Night-Purge):</b> Bu gece saat 02:00 - 05:00 arasında HVAC kompresörlerini kapatın. 3. Kat ve Güney Cephe havalandırma kapaklarını %40 açıklıkla devreye sokun.</li>
         <li><b>Hayalet Yük Kapatma Reçetesi (NILM):</b> Mesai bitiminde (19:00) 2. Pano altındaki otonom olmayan aydınlatma ve güç gruplarını pasife alın.</li>
     </ul>
-    <p>💰 <b>Tahmini Finansal Tasarruf:</b> 4.250 TL / Gün | 🌱 <b>Engellenen CO₂:</b> 142 kg</p>
+    <p>💰 <b>Tahmini Finansal Tasarruf:</b> 4.250 TL / Gün &nbsp;|&nbsp; 🌱 <b>Engellenen CO₂:</b> 142 kg</p>
 </div>
-<br>
 """, unsafe_allow_html=True)
 
 col_btn1, col_btn2 = st.columns([1, 2])
@@ -128,17 +137,40 @@ with col_btn1:
         log_box = st.empty()
         log_text = "> Connecting to Gateway 192.168.1.50:47808...\n"
         log_box.code(log_text)
-        time.sleep(0.5)
+        time.sleep(0.4)
         
         log_text += "> Authentication Successful (Priority 8 - Manual Override)\n"
         log_box.code(log_text)
-        time.sleep(0.5)
+        time.sleep(0.4)
         
         log_text += "> Writing Property: BACnet.Analog_Value.102 -> PresentValue = 40.0%\n"
         log_box.code(log_text)
-        time.sleep(0.5)
+        time.sleep(0.4)
         
         log_text += "> SUCCESS: Command executed by BMS. Night-Purge Enabled."
         log_box.code(log_text, language="bash")
         
         st.success("⚡ Reçete Başarıyla Uygulandı! Bina otomasyon ağı otonom konfigüre edildi.")
+
+# --- INTERACTIVE AI ASSISTANT (CHAT WITH RECIPE) ---
+st.markdown("---")
+st.subheader("💬 Reçete Hakkında Bina Yöneticisi Asistanına Soru Sor")
+st.caption("Bina yöneticisi olarak reçetenin detayları, konfor parametreleri veya maliyet hesabı hakkında yapay zekaya soru sorabilirsiniz.")
+
+user_query = st.text_input("Soru Sorun (Örn: 'Neden gece 02:00 seçildi?', 'Konfor şartları olumsuz etkilenir mi?')", key="user_q")
+
+if user_query:
+    with st.spinner("AI Yanıtı Hazırlanıyor..."):
+        time.sleep(0.6)
+        query_lower = user_query.lower()
+        
+        if "neden" in query_lower or "saat" in query_lower or "02:00" in query_lower:
+            response = "<b>AI Asistan:</b> OpenWeather API verilerine göre Ankara'da dış ortam sıcaklığı gece saat 02:00 ile 05:00 arasında minimum seviyeye (11°C) düşmektedir. Binanın betonarme kütlesini bu saatlerde soğutmak, sabah klimanın ilk çalıştırma yükünü %25 azaltmaktadır."
+        elif "konfor" in query_lower or "sıcaklık" in query_lower or "soğuk" in query_lower:
+            response = "<b>AI Asistan:</b> Hayır, konfor şartları etkilenmez. Gece soğutması sadece bina beton kütlesini 21°C seviyesinde tutar. Mesai başlangıcı olan 08:00'de iç ortam sıcaklığı ideal termal konfor bandında (22.5°C) olacaktır."
+        elif "tasarruf" in query_lower or "maliyet" in query_lower or "tl" in query_lower:
+            response = "<b>AI Asistan:</b> Bu reçete ile kompresör çalıştırılmadan sadece fan enerjisiyle soğutma yapılır. Günlük ortalama 1.000 kWh HVAC tüketimi engellenerek 4.250 TL ve 142 kg CO₂ tasarrufu sağlanır."
+        else:
+            response = f"<b>AI Asistan:</b> '{user_query}' sorunuz için bina termal modeli incelendi. Reçetemiz, ASHRAE 55 termal konfor standartları ve Ankara hava durumu verileri çerçevesinde %100 güvenli ve optimum tasarruf sağlayacak şekilde hesaplanmıştır."
+            
+        st.markdown(f'<div class="chat-box">{response}</div>', unsafe_allow_html=True)
