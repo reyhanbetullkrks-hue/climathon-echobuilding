@@ -76,19 +76,23 @@ st.markdown("---")
 st.sidebar.header("🏢 Bina & Konum Parametreleri")
 building_type = st.sidebar.selectbox("Bina Tipi", ["Kamu Kompleksi", "Ticari Plaza / İş Merkezi", "Üniversite Kampüs Binası"])
 location = st.sidebar.text_input("Şehir", "Ankara, TR")
-sqm = st.sidebar.number_input("Toplam Alan (m²)", value=15000)
+sqm = st.sidebar.number_input("Toplam Alan (m²)", value=15000, step=1000)
 
 st.sidebar.markdown("---")
 st.sidebar.header("⚙️ Simülasyon Ayarları")
 use_live_weather = st.sidebar.checkbox("Canlı Hava Durumu API (Ankara)", value=True)
 selected_day = st.sidebar.date_input("Analiz Tarihi", datetime.date.today())
 
+# --- DYNAMIC SCALE FACTOR BASED ON SQM ---
+# 15.000 m² varsayılan baz alınır, alan değiştikçe tüketim ölçeklenir
+scale_factor = sqm / 15000.0
+
 # --- MOCK DATA GENERATOR (NILM & Energy Consumption) ---
 @st.cache_data
-def load_energy_data():
+def load_energy_data(factor):
     dates = pd.date_range(start=datetime.datetime.now() - datetime.timedelta(days=1), periods=24, freq='h')
-    base_load = [35, 32, 30, 28, 29, 31, 65, 120, 180, 210, 220, 215, 200, 210, 225, 230, 190, 110, 75, 55, 48, 42, 38, 36]
-    phantom_load = [12, 12, 11, 11, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 12, 12, 12, 12, 12]
+    base_load = [int(x * factor) for x in [35, 32, 30, 28, 29, 31, 65, 120, 180, 210, 220, 215, 200, 210, 225, 230, 190, 110, 75, 55, 48, 42, 38, 36]]
+    phantom_load = [int(x * factor) for x in [12, 12, 11, 11, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 12, 12, 12, 12, 12]]
     
     df = pd.DataFrame({
         'Saat': [d.strftime('%H:00') for d in dates],
@@ -97,20 +101,20 @@ def load_energy_data():
     })
     return df
 
-df_energy = load_energy_data()
+df_energy = load_energy_data(scale_factor)
 
-# --- DETAYLI MATEMATİKSEL TASARRUF HESABI ---
+# --- DETAYLI DİNAMİK MATEMATİKSEL TASARRUF HESABI ---
 total_today = df_energy['Top Tüketim (kWh)'].sum()
 phantom_today = df_energy['Hayalet Yük / İsraf (kWh)'].sum()
-waste_percentage = round((phantom_today / total_today) * 100, 1)
+waste_percentage = round((phantom_today / total_today) * 100, 1) if total_today > 0 else 0
 
 # 1. NILM Tasarrufu (Hayalet Yükün %80'i)
 nilm_kwh_save = int(phantom_today * 0.8)
 nilm_tl_save = int(nilm_kwh_save * 4.25)
 nilm_co2_save = round(nilm_kwh_save * 0.42, 1)
 
-# 2. Night-Purge (Gece Soğutması) Tasarrufu
-np_kwh_save = 220
+# 2. Night-Purge (Gece Soğutması) Tasarrufu (Alana bağlı dinamik)
+np_kwh_save = int(220 * scale_factor)
 np_tl_save = int(np_kwh_save * 4.25)
 np_co2_save = round(np_kwh_save * 0.42, 1)
 
@@ -123,9 +127,9 @@ total_co2_saved = round(nilm_co2_save + np_co2_save, 1)
 col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Günlük Toplam Tüketim", f"{total_today:,} kWh")
-col2.metric("NILM Tespiti: Hayalet Yük", f"{phantom_today} kWh", delta=f"%{waste_percentage} İsraf Mevcut", delta_color="inverse")
-col3.metric("Hedeflenen Toplam Tasarruf", f"{total_kwh_saved} kWh", delta=f"NILM: {nilm_kwh_save} kWh | Purge: {np_kwh_save} kWh", delta_color="normal")
-col4.metric("Engellenecek Toplam Karbon", f"{total_co2_saved} kg CO₂", delta=f"NILM: {nilm_co2_save}kg | Purge: {np_co2_save}kg", delta_color="normal")
+col2.metric("NILM Tespiti: Hayalet Yük", f"{phantom_today:,} kWh", delta=f"%{waste_percentage} İsraf Mevcut", delta_color="inverse")
+col3.metric("Hedeflenen Toplam Tasarruf", f"{total_kwh_saved:,} kWh", delta=f"NILM: {nilm_kwh_save} kWh | Purge: {np_kwh_save} kWh", delta_color="normal")
+col4.metric("Engellenecek Toplam Karbon", f"{total_co2_saved:,} kg CO₂", delta=f"NILM: {nilm_co2_save}kg | Purge: {np_co2_save}kg", delta_color="normal")
 
 st.markdown("---")
 
@@ -135,7 +139,7 @@ tab1, tab2 = st.tabs(["📊 Yük Ayrıştırma (NILM) & İsraf Analizi", "🌡�
 with tab1:
     st.subheader("Bina Ana Pano Saatlik Elektrik Tüketimi (NILM Analizi)")
     st.bar_chart(df_energy.set_index('Saat')[['Top Tüketim (kWh)', 'Hayalet Yük / İsraf (kWh)']])
-    st.info(f"💡 **NILM Teşhisi:** Gece mesai dışı atıl çalışan cihazların kapatılmasıyla günde **{nilm_kwh_save} kWh ({nilm_tl_save} TL / {nilm_co2_save} kg CO₂)** tasarruf elde edilir.")
+    st.info(f"💡 **NILM Teşhisi:** {sqm:,} m² alan için gece mesai dışı atıl çalışan cihazların kapatılmasıyla günde **{nilm_kwh_save:,} kWh ({nilm_tl_save:,} TL / {nilm_co2_save:,} kg CO₂)** tasarruf elde edilir.")
 
 with tab2:
     st.subheader("Ankara Termal Kütle ve Dış Hava Sıcaklık Grafiği")
@@ -145,7 +149,7 @@ with tab2:
     
     df_temp = pd.DataFrame({'Dış Hava (°C)': outside_temp, 'Bina İç Sıcaklık (°C)': inside_temp}, index=hours)
     st.line_chart(df_temp)
-    st.success(f"✅ **Pasif Potansiyel:** Gece 01:00 - 05:00 arasında dış hava 11-12°C'ye düşmektedir. Night-Purge ile günde ekstra **{np_kwh_save} kWh ({np_tl_save} TL / {np_co2_save} kg CO₂)** pasif soğutma kazanılır.")
+    st.success(f"✅ **Pasif Potansiyel:** Gece 01:00 - 05:00 arasında dış hava 11-12°C'ye düşmektedir. Night-Purge ile günde ekstra **{np_kwh_save:,} kWh ({np_tl_save:,} TL / {np_co2_save:,} kg CO₂)** pasif soğutma kazanılır.")
 
 st.markdown("---")
 
@@ -155,15 +159,15 @@ st.subheader("🤖 AI Preskriptif Karar Destek ve Otonom Reçete Motoru")
 st.markdown(f"""
 <div class="recipe-card">
     <h4>📋 GÜNÜN OTONOM ENERJİ TASARRUF REÇETESİ</h4>
-    <p><b>Konum:</b> Ankara, Türkiye | <b>Sistem Durumu:</b> BMS Bağlantısı Aktif (BACnet/IP Gateway)</p>
+    <p><b>Konum:</b> Ankara, Türkiye | <b>Bina Tipi:</b> {building_type} ({sqm:,} m²) | <b>Sistem Durumu:</b> BMS Bağlantısı Aktif (BACnet/IP Gateway)</p>
     <ul>
-        <li><b>🌙 Pasif Gece Soğutması (Night-Purge):</b> Gece 02:00 - 05:00 arasında HVAC kompresörlerini kapatın, havalandırmayı %40 açın. <br>👉 <i>Katkı: {np_tl_save} TL / {np_co2_save} kg CO₂</i></li>
-        <li style="margin-top: 8px;"><b>🔌 Hayalet Yük Kapatma (NILM):</b> Mesai bitiminde (19:00) 2. Pano altındaki güç gruplarını pasife alın. <br>👉 <i>Katkı: {nilm_tl_save} TL / {nilm_co2_save} kg CO₂</i></li>
+        <li><b>🌙 Pasif Gece Soğutması (Night-Purge):</b> Gece 02:00 - 05:00 arasında HVAC kompresörlerini kapatın, havalandırmayı %40 açın. <br>👉 <i>Katkı: {np_tl_save:,} TL / {np_co2_save:,} kg CO₂</i></li>
+        <li style="margin-top: 8px;"><b>🔌 Hayalet Yük Kapatma (NILM):</b> Mesai bitiminde (19:00) 2. Pano altındaki güç gruplarını pasife alın. <br>👉 <i>Katkı: {nilm_tl_save:,} TL / {nilm_co2_save:,} kg CO₂</i></li>
     </ul>
     <br>
     <div>
         <span class="impact-badge-green">💰 Toplam Tasarruf: {total_tl_saved:,} TL / Gün</span>
-        <span class="impact-badge-blue">🌱 Toplam Karbon Engelleme: {total_co2_saved} kg CO₂</span>
+        <span class="impact-badge-blue">🌱 Toplam Karbon Engelleme: {total_co2_saved:,} kg CO₂</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -185,7 +189,7 @@ with col_btn1:
         log_box.code(log_text)
         time.sleep(0.4)
         
-        log_text += "> Writing Property: BACnet.Analog_Value.102 -> PresentValue = 40.0%\n"
+        log_text += f"> Writing Property: BACnet.Analog_Value.102 -> TargetArea = {sqm}m2 -> PresentValue = 40.0%\n"
         log_box.code(log_text)
         time.sleep(0.4)
         
@@ -214,9 +218,9 @@ if selected_question == "❓ NILM ve Night-Purge tasarruf kalemleri ayrı ayrı 
     st.markdown(f"""
     <div class="chat-box">
         <b>🤖 AI Preskriptif Analiz:</b><br>
-        • <b>NILM (Hayalet Yük):</b> Gece açık unutulan fan ve UPS kaçaklarını keserek <b>{nilm_kwh_save} kWh ({nilm_tl_save} TL / {nilm_co2_save} kg CO₂)</b> tasarruf sağlar.<br>
-        • <b>Night-Purge (Gece Soğutması):</b> Kompresörsüz pasif havalandırmayla <b>{np_kwh_save} kWh ({np_tl_save} TL / {np_co2_save} kg CO₂)</b> tasarruf sağlar.<br>
-        • <b>Toplam Günlük Etki:</b> {total_kwh_saved} kWh ({total_tl_saved} TL ve {total_co2_saved} kg CO₂).
+        • <b>NILM (Hayalet Yük):</b> Gece açık unutulan fan ve UPS kaçaklarını keserek <b>{nilm_kwh_save:,} kWh ({nilm_tl_save:,} TL / {nilm_co2_save:,} kg CO₂)</b> tasarruf sağlar.<br>
+        • <b>Night-Purge (Gece Soğutması):</b> Kompresörsüz pasif havalandırmayla <b>{np_kwh_save:,} kWh ({np_tl_save:,} TL / {np_co2_save:,} kg CO₂)</b> tasarruf sağlar.<br>
+        • <b>Toplam Günlük Etki ({sqm:,} m²):</b> {total_kwh_saved:,} kWh ({total_tl_saved:,} TL ve {total_co2_saved:,} kg CO₂).
     </div>
     """, unsafe_allow_html=True)
 
