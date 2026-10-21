@@ -1,15 +1,37 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
 import datetime
+import time
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="EchoBuilding AI - Energy Decision System",
     page_icon="⚡",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# --- CUSTOM CSS FOR BETTER UI ---
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stMetric {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-left: 5px solid #00d26a;
+    }
+    .recipe-card {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # --- TITLE & HEADER ---
 st.title("⚡ EchoBuilding AI: Dairesel Bina Enerji İşletim Sistemi")
@@ -24,16 +46,13 @@ location = st.sidebar.text_input("Şehir", "Ankara, TR")
 sqm = st.sidebar.number_input("Toplam Alan (m²)", value=15000)
 
 st.sidebar.markdown("---")
-st.sidebar.header("⚙️ Simulation Settings")
+st.sidebar.header("⚙️ Simülasyon Ayarları")
 use_live_weather = st.sidebar.checkbox("Canlı Hava Durumu API (Ankara)", value=True)
-
-# API Key Simulation
-openai_api_key = st.sidebar.text_input("OpenAI API Key (Opsiyonel)", type="password", help="Boş bırakılırsa kural tabanlı AI simülatörü çalışır.")
+selected_day = st.sidebar.date_input("Analiz Tarihi", datetime.date.today())
 
 # --- MOCK DATA GENERATOR (NILM & Energy Consumption) ---
 @st.cache_data
 def load_energy_data():
-    # freq='h' olarak düzeltildi
     dates = pd.date_range(start=datetime.datetime.now() - datetime.timedelta(days=1), periods=24, freq='h')
     base_load = [35, 32, 30, 28, 29, 31, 65, 120, 180, 210, 220, 215, 200, 210, 225, 230, 190, 110, 75, 55, 48, 42, 38, 36]
     phantom_load = [12, 12, 11, 11, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 12, 12, 12, 12, 12] # Mesai dışı israf
@@ -47,13 +66,13 @@ def load_energy_data():
 
 df_energy = load_energy_data()
 
-# --- MAIN DASHBOARD LAYOUT ---
+# --- MAIN DASHBOARD METRICS ---
 col1, col2, col3, col4 = st.columns(4)
 
 total_today = df_energy['Top Tüketim (kWh)'].sum()
 phantom_today = df_energy['Hayalet Yük / İsraf (kWh)'].sum()
 waste_percentage = round((phantom_today / total_today) * 100, 1)
-co2_saved_est = round((phantom_today * 0.8 * 0.42), 1) # kg CO2
+co2_saved_est = round((phantom_today * 0.8 * 0.42), 1)
 
 col1.metric("Günlük Toplam Tüketim", f"{total_today:,} kWh")
 col2.metric("NILM Tespiti: Hayalet Yük", f"{phantom_today} kWh", delta=f"%{waste_percentage} İsraf", delta_color="inverse")
@@ -85,28 +104,41 @@ st.markdown("---")
 # --- AI PRESCRIPTIVE DECISION ENGINE ---
 st.subheader("🤖 AI Preskriptif Karar Destek ve Otonom Reçete Motoru")
 
-def generate_ai_recipe():
-    return """
-    ### 📋 GÜNÜN OTONOM ENERJİ TASARRUF REÇETESİ
-    **Tarih/Saat:** 21 Ekim 2026 | **Konum:** Ankara
-    
-    1. **Gece Soğutması Reçetesi (Night-Purge):**
-       - **Aksiyon:** Bu gece saat 02:00 - 05:00 arasında HVAC gazlı soğutma kompresörlerini kapatın. 3. Kat ve Güney Cephe havalandırma kapaklarını %40 açıklıkla devreye sokun.
-       - **Gerekçe:** Dış hava 11°C'ye düşmektedir. Beton kütleyi pasif soğutmak, yarın sabahki ilk çalıştırma yükünü %25 azaltacaktır.
-    
-    2. **Hayalet Yük Kapatma Reçetesi (NILM):**
-       - **Aksiyon:** Mesai bitiminde (19:00) 2. Pano altındaki otonom olmayan aydınlatma ve güç gruplarını pasife alın.
-    
-    ---
-    💰 **Tahmini Finansal Tasarruf:** 4.250 TL / Gün  
-    🌱 **Engellenen CO₂ Emisyonu:** 142 kg  
-    🔌 **BMS İletişim Protokolü:** BACnet/IP (WriteProperty -> AV:102 -> 40%)
-    """
+st.markdown("""
+<div class="recipe-card">
+    <h4>📋 GÜNÜN OTONOM ENERJİ TASARRUF REÇETESİ</h4>
+    <p><b>Konum:</b> Ankara, Türkiye | <b>Sistem Durumu:</b> BMS Bağlantısı Aktif (BACnet/IP Gateway)</p>
+    <ul>
+        <li><b>Gece Soğutması Reçetesi (Night-Purge):</b> Bu gece saat 02:00 - 05:00 arasında HVAC kompresörlerini kapatın. 3. Kat ve Güney Cephe havalandırma kapaklarını %40 açıklıkla devreye sokun.</li>
+        <li><b>Hayalet Yük Kapatma Reçetesi (NILM):</b> Mesai bitiminde (19:00) 2. Pano altındaki otonom olmayan aydınlatma ve güç gruplarını pasife alın.</li>
+    </ul>
+    <p>💰 <b>Tahmini Finansal Tasarruf:</b> 4.250 TL / Gün | 🌱 <b>Engellenen CO₂:</b> 142 kg</p>
+</div>
+<br>
+""", unsafe_allow_html=True)
 
-st.markdown(generate_ai_recipe())
+col_btn1, col_btn2 = st.columns([1, 2])
 
-col_btn1, col_btn2 = st.columns([1, 4])
 with col_btn1:
-    if st.button("✅ REÇETEYİ ONAYLA & BMS'E İLET", type="primary"):
+    if st.button("✅ REÇETEYİ ONAYLA & BMS'E İLET", type="primary", use_container_width=True):
         st.balloons()
-        st.success("⚡ BACnet/IP Komutu Gönderildi! Bina Otomasyon Panosu Reçeteyi Uyguluyor...")
+        
+        # BMS Terminal Log Simulation
+        st.markdown("##### 🔌 BACnet/IP Terminal Logları:")
+        log_box = st.empty()
+        log_text = "> Connecting to Gateway 192.168.1.50:47808...\n"
+        log_box.code(log_text)
+        time.sleep(0.5)
+        
+        log_text += "> Authentication Successful (Priority 8 - Manual Override)\n"
+        log_box.code(log_text)
+        time.sleep(0.5)
+        
+        log_text += "> Writing Property: BACnet.Analog_Value.102 -> PresentValue = 40.0%\n"
+        log_box.code(log_text)
+        time.sleep(0.5)
+        
+        log_text += "> SUCCESS: Command executed by BMS. Night-Purge Enabled."
+        log_box.code(log_text, language="bash")
+        
+        st.success("⚡ Reçete Başarıyla Uygulandı! Bina otomasyon ağı otonom konfigüre edildi.")
