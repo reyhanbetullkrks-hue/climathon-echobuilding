@@ -12,26 +12,47 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CUSTOM CSS FOR FIXED TEXT VISIBILITY & MODERN UI ---
+# --- CUSTOM CSS FOR HIGH VISIBILITY & UI ENHANCEMENTS ---
 st.markdown("""
     <style>
-    /* Dark mode çakışmalarını önlemek için metin renkleri sabitlendi */
     .recipe-card {
         background-color: #ffffff !important;
         color: #1e1e1e !important;
-        padding: 22px;
-        border-radius: 12px;
+        padding: 24px;
+        border-radius: 14px;
         border-left: 6px solid #00d26a;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         margin-bottom: 20px;
     }
     .recipe-card h4 {
         color: #0f5132 !important;
         margin-top: 0;
+        font-size: 20px;
     }
     .recipe-card p, .recipe-card li {
         color: #2b2b2b !important;
         font-size: 15px;
+    }
+    .impact-badge-green {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-weight: bold;
+        font-size: 18px;
+        display: inline-block;
+        margin-right: 12px;
+        border: 1px solid #badbcc;
+    }
+    .impact-badge-blue {
+        background-color: #cff4fc;
+        color: #055160;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-weight: bold;
+        font-size: 18px;
+        display: inline-block;
+        border: 1px solid #b6effb;
     }
     .chat-box {
         background-color: #f8f9fa !important;
@@ -85,9 +106,9 @@ waste_percentage = round((phantom_today / total_today) * 100, 1)
 co2_saved_est = round((phantom_today * 0.8 * 0.42), 1)
 
 col1.metric("Günlük Toplam Tüketim", f"{total_today:,} kWh")
-col2.metric("NILM Tespiti: Hayalet Yük", f"{phantom_today} kWh", delta=f"%{waste_percentage} İsraf", delta_color="inverse")
-col3.metric("Hedeflenen Günlük Tasarruf", f"{int(phantom_today * 0.8)} kWh", delta="-%80 İsraf Önleme")
-col4.metric("Engellenecek Karbon", f"{co2_saved_est} kg CO₂", delta="Ağaç Denkliği: 3 Ağaç")
+col2.metric("NILM Tespiti: Hayalet Yük", f"{phantom_today} kWh", delta=f"%{waste_percentage} İsraf Mevcut", delta_color="inverse")
+col3.metric("Hedeflenen Günlük Tasarruf", f"{int(phantom_today * 0.8)} kWh", delta="%80 İsraf Önleme Target", delta_color="normal")
+col4.metric("Engellenecek Karbon", f"{co2_saved_est} kg CO₂", delta="Ağaç Denkliği: 3 Ağaç", delta_color="normal")
 
 st.markdown("---")
 
@@ -111,7 +132,7 @@ with tab2:
 
 st.markdown("---")
 
-# --- AI PRESCRIPTIVE DECISION ENGINE & INTERACTIVE ASSISTANT ---
+# --- AI PRESCRIPTIVE DECISION ENGINE ---
 st.subheader("🤖 AI Preskriptif Karar Destek ve Otonom Reçete Motoru")
 
 st.markdown("""
@@ -119,10 +140,14 @@ st.markdown("""
     <h4>📋 GÜNÜN OTONOM ENERJİ TASARRUF REÇETESİ</h4>
     <p><b>Konum:</b> Ankara, Türkiye | <b>Sistem Durumu:</b> BMS Bağlantısı Aktif (BACnet/IP Gateway)</p>
     <ul>
-        <li><b>Gece Soğutması Reçetesi (Night-Purge):</b> Bu gece saat 02:00 - 05:00 arasında HVAC kompresörlerini kapatın. 3. Kat ve Güney Cephe havalandırma kapaklarını %40 açıklıkla devreye sokun.</li>
-        <li><b>Hayalet Yük Kapatma Reçetesi (NILM):</b> Mesai bitiminde (19:00) 2. Pano altındaki otonom olmayan aydınlatma ve güç gruplarını pasife alın.</li>
+        <li><b>🌙 Gece Soğutması Reçetesi (Night-Purge):</b> Bu gece saat 02:00 - 05:00 arasında HVAC kompresörlerini kapatın. 3. Kat ve Güney Cephe havalandırma kapaklarını %40 açıklıkla devreye sokun.</li>
+        <li><b>🔌 Hayalet Yük Kapatma Reçetesi (NILM):</b> Mesai bitiminde (19:00) 2. Pano altındaki otonom olmayan aydınlatma ve güç gruplarını pasife alın.</li>
     </ul>
-    <p>💰 <b>Tahmini Finansal Tasarruf:</b> 4.250 TL / Gün &nbsp;|&nbsp; 🌱 <b>Engellenen CO₂:</b> 142 kg</p>
+    <br>
+    <div>
+        <span class="impact-badge-green">💰 Günlük Tasarruf: 4.250 TL</span>
+        <span class="impact-badge-blue">🌱 Karbon Engelleme: 142 kg CO₂</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -152,7 +177,7 @@ with col_btn1:
         
         st.success("⚡ Reçete Başarıyla Uygulandı! Bina otomasyon ağı otonom konfigüre edildi.")
 
-# --- INTERACTIVE AI ASSISTANT (CHAT WITH RECIPE) ---
+# --- INTERACTIVE AI ASSISTANT ---
 st.markdown("---")
 st.subheader("💬 Reçete Hakkında Bina Yöneticisi Asistanına Soru Sor")
 st.caption("Bina yöneticisi olarak reçetenin detayları, konfor parametreleri veya maliyet hesabı hakkında yapay zekaya soru sorabilirsiniz.")
