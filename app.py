@@ -99,26 +99,33 @@ def load_energy_data():
 
 df_energy = load_energy_data()
 
-# --- DYNAMIC CALCULATIONS (TAM UYUMLU MATEMATİK) ---
+# --- DETAYLI MATEMATİKSEL TASARRUF HESABI ---
 total_today = df_energy['Top Tüketim (kWh)'].sum()
 phantom_today = df_energy['Hayalet Yük / İsraf (kWh)'].sum()
 waste_percentage = round((phantom_today / total_today) * 100, 1)
 
-# NILM + Night Purge Toplam Tasarrufu
-night_purge_kwh_save = 220  # Gece kompresör kapatıp soğutmaktan gelen kWh tasarruf
-total_kwh_saved = int((phantom_today * 0.8) + night_purge_kwh_save)
+# 1. NILM Tasarrufu (Hayalet Yükün %80'i)
+nilm_kwh_save = int(phantom_today * 0.8)
+nilm_tl_save = int(nilm_kwh_save * 4.25)
+nilm_co2_save = round(nilm_kwh_save * 0.42, 1)
 
-# Karbon Faktörü (0.42 kg CO2 / kWh) & Finansal Faktör (4.25 TL / kWh)
-co2_saved_total = round(total_kwh_saved * 0.42, 1)
-tl_saved_total = int(total_kwh_saved * 4.25)
+# 2. Night-Purge (Gece Soğutması) Tasarrufu
+np_kwh_save = 220
+np_tl_save = int(np_kwh_save * 4.25)
+np_co2_save = round(np_kwh_save * 0.42, 1)
+
+# 3. Toplamlar
+total_kwh_saved = nilm_kwh_save + np_kwh_save
+total_tl_saved = nilm_tl_save + np_tl_save
+total_co2_saved = round(nilm_co2_save + np_co2_save, 1)
 
 # --- MAIN DASHBOARD METRICS ---
 col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Günlük Toplam Tüketim", f"{total_today:,} kWh")
 col2.metric("NILM Tespiti: Hayalet Yük", f"{phantom_today} kWh", delta=f"%{waste_percentage} İsraf Mevcut", delta_color="inverse")
-col3.metric("Hedeflenen Günlük Tasarruf", f"{total_kwh_saved} kWh", delta="%80 İsraf + Night-Purge", delta_color="normal")
-col4.metric("Engellenecek Karbon", f"{co2_saved_total} kg CO₂", delta="Ağaç Denkliği: 6 Ağaç", delta_color="normal")
+col3.metric("Hedeflenen Toplam Tasarruf", f"{total_kwh_saved} kWh", delta=f"NILM: {nilm_kwh_save} kWh | Purge: {np_kwh_save} kWh", delta_color="normal")
+col4.metric("Engellenecek Toplam Karbon", f"{total_co2_saved} kg CO₂", delta=f"NILM: {nilm_co2_save}kg | Purge: {np_co2_save}kg", delta_color="normal")
 
 st.markdown("---")
 
@@ -128,7 +135,7 @@ tab1, tab2 = st.tabs(["📊 Yük Ayrıştırma (NILM) & İsraf Analizi", "🌡�
 with tab1:
     st.subheader("Bina Ana Pano Saatlik Elektrik Tüketimi (NILM Analizi)")
     st.bar_chart(df_energy.set_index('Saat')[['Top Tüketim (kWh)', 'Hayalet Yük / İsraf (kWh)']])
-    st.info("💡 **NILM Teşhisi:** Gece 22:00 - 06:00 saatleri arasında HVAC havalandırma fanları ve kesintisiz güç kaynakları (UPS) atıl çalışmaya devam etmektedir.")
+    st.info(f"💡 **NILM Teşhisi:** Gece mesai dışı atıl çalışan cihazların kapatılmasıyla günde **{nilm_kwh_save} kWh ({nilm_tl_save} TL / {nilm_co2_save} kg CO₂)** tasarruf elde edilir.")
 
 with tab2:
     st.subheader("Ankara Termal Kütle ve Dış Hava Sıcaklık Grafiği")
@@ -138,7 +145,7 @@ with tab2:
     
     df_temp = pd.DataFrame({'Dış Hava (°C)': outside_temp, 'Bina İç Sıcaklık (°C)': inside_temp}, index=hours)
     st.line_chart(df_temp)
-    st.success("✅ **Pasif Potansiyel:** Gece 01:00 - 05:00 arasında dış hava 11-12°C'ye düşmektedir. Gece havalandırması (Night-Purge) ile bina kütlesi bedavaya soğutulabilir.")
+    st.success(f"✅ **Pasif Potansiyel:** Gece 01:00 - 05:00 arasında dış hava 11-12°C'ye düşmektedir. Night-Purge ile günde ekstra **{np_kwh_save} kWh ({np_tl_save} TL / {np_co2_save} kg CO₂)** pasif soğutma kazanılır.")
 
 st.markdown("---")
 
@@ -150,13 +157,13 @@ st.markdown(f"""
     <h4>📋 GÜNÜN OTONOM ENERJİ TASARRUF REÇETESİ</h4>
     <p><b>Konum:</b> Ankara, Türkiye | <b>Sistem Durumu:</b> BMS Bağlantısı Aktif (BACnet/IP Gateway)</p>
     <ul>
-        <li><b>🌙 Gece Soğutması Reçetesi (Night-Purge):</b> Bu gece saat 02:00 - 05:00 arasında HVAC kompresörlerini kapatın. 3. Kat ve Güney Cephe havalandırma kapaklarını %40 açıklıkla devreye sokun.</li>
-        <li><b>🔌 Hayalet Yük Kapatma Reçetesi (NILM):</b> Mesai bitiminde (19:00) 2. Pano altındaki otonom olmayan aydınlatma ve güç gruplarını pasife alın.</li>
+        <li><b>🌙 Pasif Gece Soğutması (Night-Purge):</b> Gece 02:00 - 05:00 arasında HVAC kompresörlerini kapatın, havalandırmayı %40 açın. <br>👉 <i>Katkı: {np_tl_save} TL / {np_co2_save} kg CO₂</i></li>
+        <li style="margin-top: 8px;"><b>🔌 Hayalet Yük Kapatma (NILM):</b> Mesai bitiminde (19:00) 2. Pano altındaki güç gruplarını pasife alın. <br>👉 <i>Katkı: {nilm_tl_save} TL / {nilm_co2_save} kg CO₂</i></li>
     </ul>
     <br>
     <div>
-        <span class="impact-badge-green">💰 Günlük Tasarruf: {tl_saved_total:,} TL</span>
-        <span class="impact-badge-blue">🌱 Karbon Engelleme: {co2_saved_total} kg CO₂</span>
+        <span class="impact-badge-green">💰 Toplam Tasarruf: {total_tl_saved:,} TL / Gün</span>
+        <span class="impact-badge-blue">🌱 Toplam Karbon Engelleme: {total_co2_saved} kg CO₂</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -196,14 +203,24 @@ selected_question = st.selectbox(
     "Bir soru seçin veya merak ettiğiniz konuyu inceleyin:",
     [
         "--- Lütfen bir soru seçin ---",
+        "❓ NILM ve Night-Purge tasarruf kalemleri ayrı ayrı nedir?",
         "❓ Neden gece 02:00 - 05:00 saatleri seçildi?",
         "❓ Gece havalandırması bina içi termal konforu düşürür mü?",
-        "❓ Finansal tasarruf hesabı neye dayanıyor?",
         "❓ Eski BMS sistemimiz bu reçeteyi nasıl uygulayacak?"
     ]
 )
 
-if selected_question == "❓ Neden gece 02:00 - 05:00 saatleri seçildi?":
+if selected_question == "❓ NILM ve Night-Purge tasarruf kalemleri ayrı ayrı nedir?":
+    st.markdown(f"""
+    <div class="chat-box">
+        <b>🤖 AI Preskriptif Analiz:</b><br>
+        • <b>NILM (Hayalet Yük):</b> Gece açık unutulan fan ve UPS kaçaklarını keserek <b>{nilm_kwh_save} kWh ({nilm_tl_save} TL / {nilm_co2_save} kg CO₂)</b> tasarruf sağlar.<br>
+        • <b>Night-Purge (Gece Soğutması):</b> Kompresörsüz pasif havalandırmayla <b>{np_kwh_save} kWh ({np_tl_save} TL / {np_co2_save} kg CO₂)</b> tasarruf sağlar.<br>
+        • <b>Toplam Günlük Etki:</b> {total_kwh_saved} kWh ({total_tl_saved} TL ve {total_co2_saved} kg CO₂).
+    </div>
+    """, unsafe_allow_html=True)
+
+elif selected_question == "❓ Neden gece 02:00 - 05:00 saatleri seçildi?":
     st.markdown("""
     <div class="chat-box">
         <b>🤖 AI Preskriptif Analiz:</b><br>
@@ -216,14 +233,6 @@ elif selected_question == "❓ Gece havalandırması bina içi termal konforu d�
     <div class="chat-box">
         <b>🤖 AI Preskriptif Analiz:</b><br>
         Hayır, ASHRAE 55 standartlarına göre konfor olumsuz etkilenmez. Gece soğutması sadece bina beton kütlesini 21°C seviyesinde tutar. Mesai başlangıcı olan 08:00'de iç ortam sıcaklığı ideal termal konfor bandında (22.5°C) dengelenir.
-    </div>
-    """, unsafe_allow_html=True)
-
-elif selected_question == "❓ Finansal tasarruf hesabı neye dayanıyor?":
-    st.markdown(f"""
-    <div class="chat-box">
-        <b>🤖 AI Preskriptif Analiz:</b><br>
-        Bu reçete ile yüksek elektrik çeken gazlı soğutma kompresörleri çalıştırılmadan sadece düşük güçlü havalandırma fanlarıyla pasif soğutma yapılır. Günlük toplam {total_kwh_saved} kWh elektrik tüketimi engellenerek {tl_saved_total:,} TL ve {co2_saved_total} kg CO₂ doğrudan tasarruf edilir.
     </div>
     """, unsafe_allow_html=True)
 
