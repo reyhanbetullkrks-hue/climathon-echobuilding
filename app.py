@@ -55,11 +55,13 @@ st.markdown("""
         border: 1px solid #b6effb;
     }
     .chat-box {
-        background-color: #f8f9fa !important;
-        border: 1px solid #e9ecef;
+        background-color: #e8f5e9 !important;
+        border: 1px solid #c8e6c9;
         border-radius: 10px;
         padding: 15px;
-        color: #212529 !important;
+        color: #1b5e20 !important;
+        font-size: 15px;
+        margin-top: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -177,25 +179,50 @@ with col_btn1:
         
         st.success("⚡ Reçete Başarıyla Uygulandı! Bina otomasyon ağı otonom konfigüre edildi.")
 
-# --- INTERACTIVE AI ASSISTANT ---
+# --- RELIABLE & INTERACTIVE AI ASSISTANT ---
 st.markdown("---")
-st.subheader("💬 Reçete Hakkında Bina Yöneticisi Asistanına Soru Sor")
-st.caption("Bina yöneticisi olarak reçetenin detayları, konfor parametreleri veya maliyet hesabı hakkında yapay zekaya soru sorabilirsiniz.")
+st.subheader("💬 AI Bina Yöneticisi Asistanı (Soru - Cevap)")
+st.caption("Reçetenin gerekçesi, konfor etkisi ve maliyet hesabı hakkında yapay zeka analizini inceleyin:")
 
-user_query = st.text_input("Soru Sorun (Örn: 'Neden gece 02:00 seçildi?', 'Konfor şartları olumsuz etkilenir mi?')", key="user_q")
+selected_question = st.selectbox(
+    "Bir soru seçin veya merak ettiğiniz konuyu inceleyin:",
+    [
+        "--- Lütfen bir soru seçin ---",
+        "❓ Neden gece 02:00 - 05:00 saatleri seçildi?",
+        "❓ Gece havalandırması bina içi termal konforu düşürür mü?",
+        "❓ Finansal 4.250 TL tasarruf hesabı neye dayanıyor?",
+        "❓ Eski BMS sistemimiz bu reçeteyi nasıl uygulayacak?"
+    ]
+)
 
-if user_query:
-    with st.spinner("AI Yanıtı Hazırlanıyor..."):
-        time.sleep(0.6)
-        query_lower = user_query.lower()
-        
-        if "neden" in query_lower or "saat" in query_lower or "02:00" in query_lower:
-            response = "<b>AI Asistan:</b> OpenWeather API verilerine göre Ankara'da dış ortam sıcaklığı gece saat 02:00 ile 05:00 arasında minimum seviyeye (11°C) düşmektedir. Binanın betonarme kütlesini bu saatlerde soğutmak, sabah klimanın ilk çalıştırma yükünü %25 azaltmaktadır."
-        elif "konfor" in query_lower or "sıcaklık" in query_lower or "soğuk" in query_lower:
-            response = "<b>AI Asistan:</b> Hayır, konfor şartları etkilenmez. Gece soğutması sadece bina beton kütlesini 21°C seviyesinde tutar. Mesai başlangıcı olan 08:00'de iç ortam sıcaklığı ideal termal konfor bandında (22.5°C) olacaktır."
-        elif "tasarruf" in query_lower or "maliyet" in query_lower or "tl" in query_lower:
-            response = "<b>AI Asistan:</b> Bu reçete ile kompresör çalıştırılmadan sadece fan enerjisiyle soğutma yapılır. Günlük ortalama 1.000 kWh HVAC tüketimi engellenerek 4.250 TL ve 142 kg CO₂ tasarrufu sağlanır."
-        else:
-            response = f"<b>AI Asistan:</b> '{user_query}' sorunuz için bina termal modeli incelendi. Reçetemiz, ASHRAE 55 termal konfor standartları ve Ankara hava durumu verileri çerçevesinde %100 güvenli ve optimum tasarruf sağlayacak şekilde hesaplanmıştır."
-            
-        st.markdown(f'<div class="chat-box">{response}</div>', unsafe_allow_html=True)
+if selected_question == "❓ Neden gece 02:00 - 05:00 saatleri seçildi?":
+    st.markdown("""
+    <div class="chat-box">
+        <b>🤖 AI Preskriptif Analiz:</b><br>
+        OpenWeather API verilerine göre Ankara'da dış ortam sıcaklığı gece saat 02:00 - 05:00 arasında minimum seviyeye (11°C) düşmektedir. Binanın betonarme kütlesini bu saatlerde doğal havayla soğutmak, sabah klimanın ilk çalıştırma pik yükünü %25 azaltmaktadır.
+    </div>
+    """, unsafe_allow_html=True)
+
+elif selected_question == "❓ Gece havalandırması bina içi termal konforu düşürür mü?":
+    st.markdown("""
+    <div class="chat-box">
+        <b>🤖 AI Preskriptif Analiz:</b><br>
+        Hayır, ASHRAE 55 standartlarına göre konfor olumsuz etkilenmez. Gece soğutması sadece bina beton kütlesini 21°C seviyesinde tutar. Mesai başlangıcı olan 08:00'de iç ortam sıcaklığı ideal termal konfor bandında (22.5°C) dengelenir.
+    </div>
+    """, unsafe_allow_html=True)
+
+elif selected_question == "❓ Finansal 4.250 TL tasarruf hesabı neye dayanıyor?":
+    st.markdown("""
+    <div class="chat-box">
+        <b>🤖 AI Preskriptif Analiz:</b><br>
+        Bu reçete ile yüksek elektrik çeken gazlı soğutma kompresörleri çalıştırılmadan sadece düşük güçlü havalandırma fanlarıyla pasif soğutma yapılır. Günlük ortalama 1.000 kWh HVAC elektrik tüketimi engellenerek 4.250 TL ve 142 kg CO₂ doğrudan tasarruf edilir.
+    </div>
+    """, unsafe_allow_html=True)
+
+elif selected_question == "❓ Eski BMS sistemimiz bu reçeteyi nasıl uygulayacak?":
+    st.markdown("""
+    <div class="chat-box">
+        <b>🤖 AI Preskriptif Analiz:</b><br>
+        Geliştirdiğimiz hafif IoT Yazılım Köprüsü (Gateway), eski veya yeni tüm BMS sistemlerinin kullandığı evrensel BACnet/Modbus dilini konuşur. 'REÇETEYİ ONAYLA' butonuna bastığınızda komut otonom olarak vanalara enjekte edilir.
+    </div>
+    """, unsafe_allow_html=True)
